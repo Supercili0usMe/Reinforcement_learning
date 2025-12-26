@@ -1,0 +1,34 @@
+# ===== ОБНОВЛЕННЫЕ ЗАВИСИМОСТИ ДЛЯ RTX 5070 Ti (CUDA 12.6+) =====
+# Python 3.11 required
+
+# === PyTorch с CUDA 12.6 (устанавливается отдельной командой) ===
+# torch
+# torchvision
+# torchaudio
+
+# === Reinforcement Learning ===
+gymnasium[atari,accept-rom-license]==1.0.0  # замена устаревшего gym
+ale-py>=0.9.0                               # Arcade Learning Environment для Atari
+
+# === Deep Learning утилиты ===
+numpy>=1.24.0,<2.0.0
+scipy>=1.11.0
+pillow>=10.0.0
+opencv-python>=4.8.0
+
+# === PTAN (RL библиотека) ===
+# ptan не обновлялся, может потребоваться ручная адаптация
+# Альтернатива: stable-baselines3
+
+# === Логирование и визуализация ===
+tensorboardX>=2.6
+tensorboard>=2.14.0
+
+# === Утилиты ===
+cloudpickle>=3.0.0
+packaging>=23.0
+typing-extensions>=4.5.0
+
+# === Опционально: Stable Baselines 3 (современная альтернатива ptan) ===
+# stable-baselines3[extra]>=2.2.0
+
