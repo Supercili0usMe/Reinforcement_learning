@@ -45,8 +45,8 @@ class ExperienceBuffer:
     def sample(self, batch_size):
         indices = np.random.choice(len(self.buffer), batch_size, replace=False)
         states, actions, rewards, dones, next_states = zip(*[self.buffer[idx] for idx in indices])
-        return np.array(states), np.array(actions), np.array(rewards, dtype=np.float), \
-               np.array(dones, dtype=np.int), np.array(next_states)
+        return np.array(states), np.array(actions), np.array(rewards, dtype=np.float32), \
+               np.array(dones, dtype=np.bool_), np.array(next_states)
 
 
 class Agent:
@@ -56,23 +56,26 @@ class Agent:
         self._reset()
 
     def _reset(self):
-        self.state = env.reset()
+        # Новый API gymnasium: reset() возвращает (obs, info)
+        self.state, _ = self.env.reset()
         self.total_reward = 0.0
 
     def play_step(self, net, epsilon=0.0, device="cpu"):
         done_reward = None
 
         if np.random.random() < epsilon:
-            action = env.action_space.sample()
+            action = self.env.action_space.sample()
         else:
-            state_a = np.array([self.state], copy=False)
+            state_a = np.asarray([self.state])
             state_v = torch.tensor(state_a, dtype=torch.float32).to(device)
             q_vals_v = net(state_v)
             _, act_v = torch.max(q_vals_v, dim=1)
             action = int(act_v.item())
 
         # do step in the environment
-        new_state, reward, is_done, _ = self.env.step(action)
+        # Новый API gymnasium: step() возвращает (obs, reward, terminated, truncated, info)
+        new_state, reward, terminated, truncated, _ = self.env.step(action)
+        is_done = terminated or truncated
         self.total_reward += reward
 
         exp = Experience(self.state, action, reward, is_done, new_state)
@@ -91,7 +94,8 @@ def calc_loss(batch, net, tgt_net, device="cpu"):
     next_states_v = torch.tensor(next_states, dtype=torch.float32).to(device)
     actions_v = torch.tensor(actions, dtype=torch.int64).to(device)
     rewards_v = torch.tensor(rewards, dtype=torch.float32).to(device)
-    done_mask = torch.ByteTensor(dones).to(device)
+    # Используем BoolTensor вместо устаревшего ByteTensor
+    done_mask = torch.tensor(dones, dtype=torch.bool).to(device)
 
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
     next_state_values = tgt_net(next_states_v).max(1)[0]
@@ -111,8 +115,12 @@ if __name__ == "__main__":
                         help="Mean reward boundary for stop of training, default=%.2f" % MEAN_REWARD_BOUND)
     args = parser.parse_args()
     device = torch.device("cuda" if args.cuda else "cpu")
+    print(f"Using device: {device}")
 
     env = wrappers.make_env(args.env)
+    print(f"Environment: {args.env}")
+    print(f"Observation space: {env.observation_space.shape}")
+    print(f"Action space: {env.action_space.n}")
 
     net = dqn_model.DQN(env.observation_space.shape, env.action_space.n).to(device)
     tgt_net = dqn_model.DQN(env.observation_space.shape, env.action_space.n).to(device)
@@ -130,6 +138,7 @@ if __name__ == "__main__":
     ts = time.time()
     best_mean_reward = None
 
+    print("Starting training...")
     while True:
         frame_idx += 1
         epsilon = max(EPSILON_FINAL, EPSILON_START - frame_idx / EPSILON_DECAY_LAST_FRAME)

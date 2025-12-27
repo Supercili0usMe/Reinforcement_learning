@@ -8,13 +8,18 @@ from tensorboardX import SummaryWriter
 
 import torchvision.utils as vutils
 
-import gym
-import gym.spaces
+import gymnasium as gym
+import gymnasium.spaces
+import ale_py
+
+# Регистрируем Atari окружения
+gym.register_envs(ale_py)
 
 import numpy as np
 
-log = gym.logger
-log.set_level(gym.logger.INFO)
+import logging
+log = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 LATENT_VECTOR_SIZE = 100
 DISCR_FILTERS = 64
@@ -37,12 +42,20 @@ class InputWrapper(gym.ObservationWrapper):
         super(InputWrapper, self).__init__(*args)
         assert isinstance(self.observation_space, gym.spaces.Box)
         old_space = self.observation_space
-        self.observation_space = gym.spaces.Box(self.observation(old_space.low), self.observation(old_space.high), dtype=np.float)
+        # Используем np.float32 вместо устаревшего np.float
+        new_low = self.observation(old_space.low)
+        new_high = self.observation(old_space.high)
+        self.observation_space = gym.spaces.Box(
+            low=new_low, 
+            high=new_high, 
+            shape=new_low.shape,
+            dtype=np.float32
+        )
 
     def observation(self, observation):
         new_obs = cv2.resize(observation, (IMAGE_SIZE, IMAGE_SIZE))
         new_obs = np.moveaxis(new_obs, 2, 0)
-        return new_obs.astype(np.float)
+        return new_obs.astype(np.float32)
 
 class Discriminator(nn.Module):
     def __init__(self, input_shape):
@@ -100,16 +113,19 @@ class Generator(nn.Module):
         return self.pipe(x)
 
 def iterate_batches(envs, batch_size=BATCH_SIZE):
-    batch = [e.reset() for e in envs]
+    # Новый API gymnasium: reset() возвращает (obs, info)
+    batch = [e.reset()[0] for e in envs]
     env_gen = iter(lambda: random.choice(envs), None)
 
     while True:
         e = next(env_gen)
-        obs, reward, is_done, _ = e.step(e.action_space.sample())
+        # Новый API gymnasium: step() возвращает (obs, reward, terminated, truncated, info)
+        obs, reward, terminated, truncated, info = e.step(e.action_space.sample())
+        is_done = terminated or truncated
         if np.mean(obs) > 0.01:
             batch.append(obs)
         if len(batch) == batch_size:
-            batch_np = np.array(batch, dtype=np.float) * 2.0 / 255.0 - 1.0
+            batch_np = np.array(batch, dtype=np.float32) * 2.0 / 255.0 - 1.0
             yield torch.tensor(batch_np, dtype=torch.float32)
             batch.clear()
         if is_done:
@@ -121,8 +137,16 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     device = torch.device("cuda" if args.cuda else "cpu")
-    envs = [InputWrapper(gym.make(name)) for name in ('Breakout-v0', 'AirRaid-v0', 'Pong-v0')]
+    print(f"Using device: {device}")
+    
+    # Новые имена окружений в gymnasium/ALE
+    # Используем render_mode=None для headless режима (без отображения)
+    env_names = ['ALE/Breakout-v5', 'ALE/AirRaid-v5', 'ALE/Pong-v5']
+    print(f"Creating environments: {env_names}")
+    
+    envs = [InputWrapper(gym.make(name, render_mode=None)) for name in env_names]
     input_shape = envs[0].observation_space.shape
+    print(f"Input shape: {input_shape}")
 
     net_discr = Discriminator(input_shape=input_shape).to(device)
     net_gener = Generator(output_shape=input_shape).to(device)
@@ -139,6 +163,7 @@ if __name__ == '__main__':
     true_labels_v = torch.ones(BATCH_SIZE, dtype=torch.float32, device=device)
     fake_labels_v = torch.zeros(BATCH_SIZE, dtype=torch.float32, device=device)
 
+    print("Starting training...")
     for batch_v in iterate_batches(envs):
         gen_input_v = torch.FloatTensor(BATCH_SIZE, LATENT_VECTOR_SIZE, 1, 1).normal_(0, 1).to(device)
         batch_v = batch_v.to(device)
@@ -163,7 +188,7 @@ if __name__ == '__main__':
 
         iter_no += 1
         if iter_no % REPORT_EVERY_ITER == 0:
-            log.info(f"Iter {iter_no}: gen_loss={np.mean(gen_losses)}, dis_loss={dis_losses}")
+            log.info(f"Iter {iter_no}: gen_loss={np.mean(gen_losses):.4f}, dis_loss={np.mean(dis_losses):.4f}")
             writer.add_scalar("gen_loss", np.mean(gen_losses), iter_no)
             writer.add_scalar("dis_loss", np.mean(dis_losses), iter_no)
             gen_losses = []

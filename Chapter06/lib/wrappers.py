@@ -1,8 +1,12 @@
 import cv2
-import gym
-import gym.spaces
+import gymnasium as gym
+import gymnasium.spaces
+import ale_py
 import numpy as np
 import collections
+
+# Регистрируем Atari окружения
+gym.register_envs(ale_py)
 
 
 class FireResetEnv(gym.Wrapper):
@@ -13,17 +17,18 @@ class FireResetEnv(gym.Wrapper):
         assert len(env.unwrapped.get_action_meanings()) >= 3
 
     def step(self, action):
-        return self.env.step(action)
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        return obs, reward, terminated, truncated, info
 
-    def reset(self):
-        self.env.reset()
-        obs, _, done, _ = self.env.step(1)
-        if done:
-            self.env.reset()
-        obs, _, done, _ = self.env.step(2)
-        if done:
-            self.env.reset()
-        return obs
+    def reset(self, **kwargs):
+        self.env.reset(**kwargs)
+        obs, _, terminated, truncated, info = self.env.step(1)
+        if terminated or truncated:
+            self.env.reset(**kwargs)
+        obs, _, terminated, truncated, info = self.env.step(2)
+        if terminated or truncated:
+            self.env.reset(**kwargs)
+        return obs, info
 
 
 class MaxAndSkipEnv(gym.Wrapper):
@@ -36,28 +41,30 @@ class MaxAndSkipEnv(gym.Wrapper):
 
     def step(self, action):
         total_reward = 0.0
-        done = None
+        terminated = False
+        truncated = False
+        info = {}
         for _ in range(self._skip):
-            obs, reward, done, info = self.env.step(action)
+            obs, reward, terminated, truncated, info = self.env.step(action)
             self._obs_buffer.append(obs)
             total_reward += reward
-            if done:
+            if terminated or truncated:
                 break
         max_frame = np.max(np.stack(self._obs_buffer), axis=0)
-        return max_frame, total_reward, done, info
+        return max_frame, total_reward, terminated, truncated, info
 
-    def reset(self):
+    def reset(self, **kwargs):
         """Clear past frame buffer and init. to first obs. from inner env."""
         self._obs_buffer.clear()
-        obs = self.env.reset()
+        obs, info = self.env.reset(**kwargs)
         self._obs_buffer.append(obs)
-        return obs
+        return obs, info
 
 
 class ProcessFrame84(gym.ObservationWrapper):
     def __init__(self, env=None):
         super(ProcessFrame84, self).__init__(env)
-        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(84, 84, 1), dtype=np.int)
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(84, 84, 1), dtype=np.uint8)
 
     def observation(self, obs):
         return ProcessFrame84.process(obs)
@@ -65,16 +72,16 @@ class ProcessFrame84(gym.ObservationWrapper):
     @staticmethod
     def process(frame):
         if frame.size == 210 * 160 * 3:
-            img = np.reshape(frame, [210, 160, 3]).astype(np.float)
+            img = np.reshape(frame, [210, 160, 3]).astype(np.float32)
         elif frame.size == 250 * 160 * 3:
-            img = np.reshape(frame, [250, 160, 3]).astype(np.float)
+            img = np.reshape(frame, [250, 160, 3]).astype(np.float32)
         else:
             assert False, "Unknown resolution."
         img = img[:, :, 0] * 0.299 + img[:, :, 1] * 0.587 + img[:, :, 2] * 0.114
         resized_screen = cv2.resize(img, (84, 110), interpolation=cv2.INTER_AREA)
         x_t = resized_screen[18:102, :]
         x_t = np.reshape(x_t, [84, 84, 1])
-        return x_t.astype(np.int)
+        return x_t.astype(np.uint8)
 
 
 class ImageToPyTorch(gym.ObservationWrapper):
@@ -82,7 +89,7 @@ class ImageToPyTorch(gym.ObservationWrapper):
         super(ImageToPyTorch, self).__init__(env)
         old_shape = self.observation_space.shape
         self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(old_shape[-1], old_shape[0], old_shape[1]),
-                                                dtype=np.float)
+                                                dtype=np.float32)
 
     def observation(self, observation):
         return np.moveaxis(observation, 2, 0)
@@ -90,20 +97,21 @@ class ImageToPyTorch(gym.ObservationWrapper):
 
 class ScaledFloatFrame(gym.ObservationWrapper):
     def observation(self, obs):
-        return np.array(obs).astype(np.float) / 255.0
+        return np.array(obs).astype(np.float32) / 255.0
 
 
 class BufferWrapper(gym.ObservationWrapper):
-    def __init__(self, env, n_steps, dtype=np.float):
+    def __init__(self, env, n_steps, dtype=np.float32):
         super(BufferWrapper, self).__init__(env)
         self.dtype = dtype
         old_space = env.observation_space
         self.observation_space = gym.spaces.Box(old_space.low.repeat(n_steps, axis=0),
                                                 old_space.high.repeat(n_steps, axis=0), dtype=dtype)
 
-    def reset(self):
+    def reset(self, **kwargs):
         self.buffer = np.zeros_like(self.observation_space.low, dtype=self.dtype)
-        return self.observation(self.env.reset())
+        obs, info = self.env.reset(**kwargs)
+        return self.observation(obs), info
 
     def observation(self, observation):
         self.buffer[:-1] = self.buffer[1:]
@@ -111,8 +119,18 @@ class BufferWrapper(gym.ObservationWrapper):
         return self.buffer
 
 
-def make_env(env_name):
-    env = gym.make(env_name)
+def make_env(env_name, render_mode=None):
+    # Преобразуем старые имена в новые для gymnasium/ALE
+    env_name_map = {
+        "PongNoFrameskip-v4": "ALE/Pong-v5",
+        "BreakoutNoFrameskip-v4": "ALE/Breakout-v5",
+        "SpaceInvadersNoFrameskip-v4": "ALE/SpaceInvaders-v5",
+    }
+    
+    actual_env_name = env_name_map.get(env_name, env_name)
+    
+    # Для v5 окружений frameskip уже отключен по умолчанию
+    env = gym.make(actual_env_name, frameskip=1, render_mode=render_mode)
     env = MaxAndSkipEnv(env)
     env = FireResetEnv(env)
     env = ProcessFrame84(env)
