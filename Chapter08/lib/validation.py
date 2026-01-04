@@ -14,7 +14,11 @@ def validation_run(env, net, episodes=100, device="cpu", epsilon=0.02, comission
     }
 
     for episode in range(episodes):
-        obs = env.reset()
+        result = env.reset()
+        if isinstance(result, tuple):
+            obs, _ = result
+        else:
+            obs = result
 
         total_reward = 0.0
         position = None
@@ -43,7 +47,14 @@ def validation_run(env, net, episodes=100, device="cpu", epsilon=0.02, comission
                 position = None
                 position_steps = None
 
-            obs, reward, done, _ = env.step(action_idx)
+            # gymnasium API: obs, reward, terminated, truncated, info
+            result = env.step(action_idx)
+            if len(result) == 5:
+                obs, reward, terminated, truncated, info = result
+                done = terminated or truncated
+            else:
+                obs, reward, done, info = result
+            
             total_reward += reward
             episode_steps += 1
             if position_steps is not None:

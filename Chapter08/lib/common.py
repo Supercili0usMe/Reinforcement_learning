@@ -77,8 +77,8 @@ def unpack_batch(batch):
             last_states.append(state)
         else:
             last_states.append(np.array(exp.last_state, copy=False))
-    return np.array(states, copy=False), np.array(actions), np.array(rewards, dtype=np.float), \
-        np.array(dones, dtype=np.int), np.array(last_states, copy=False)
+    return np.array(states, copy=False), np.array(actions), np.array(rewards, dtype=np.float64), \
+        np.array(dones, dtype=np.int64), np.array(last_states, copy=False)
 
 def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
     states, actions, rewards, dones, next_states = unpack_batch(batch)

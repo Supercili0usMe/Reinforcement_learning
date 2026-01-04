@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
-import gym
-import ptan
+import gymnasium as gym
 import argparse
 import numpy as np
 
@@ -9,6 +8,7 @@ import torch
 import torch.optim as optim
 
 from lib import environ, data, models, common, validation
+from lib import ptan_compat as ptan
 
 from tensorboardX import SummaryWriter
 
@@ -71,11 +71,11 @@ if __name__ == "__main__":
     writer = SummaryWriter(comment="-conv-" + args.run)
     net = models.DQNConv1D(env.observation_space.shape, env.action_space.n).to(device)
     print(net)
-    tgt_net = ptan.agent.TargetNet(net)
-    selector = ptan.actions.EpsilonGreedyActionSelector(EPSILON_START)
-    agent = ptan.agent.DQNAgent(net, selector, device=device)
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
-    buffer = ptan.experience.ExperienceReplayBuffer(exp_source, REPLAY_SIZE)
+    tgt_net = ptan.TargetNet(net)
+    selector = ptan.EpsilonGreedyActionSelector(EPSILON_START)
+    agent = ptan.DQNAgent(net, selector, device=device)
+    exp_source = ptan.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
+    buffer = ptan.ExperienceReplayBuffer(exp_source, REPLAY_SIZE)
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
     # main training loop

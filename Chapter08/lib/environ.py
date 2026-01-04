@@ -1,6 +1,5 @@
-import gym
-import gym.spaces
-from gym.utils import seeding
+import gymnasium as gym
+import gymnasium.spaces
 import enum
 import numpy as np
 
@@ -50,7 +49,7 @@ class State:
         """
         Convert current state into numpy array.
         """
-        res = np.ndarray(shape=self.shape, dtype=np.float)
+        res = np.ndarray(shape=self.shape, dtype=np.float64)
         shift = 0
         for bar_idx in range(-self.bars_count+1, 1):
             res[shift] = self._prices.high[self._offset + bar_idx]
@@ -124,7 +123,7 @@ class State1D(State):
             return (5, self.bars_count)
 
     def encode(self):
-        res = np.zeros(shape=self.shape, dtype=np.float)
+        res = np.zeros(shape=self.shape, dtype=np.float64)
         ofs = self.bars_count-1
         res[0] = self._prices.high[self._offset-ofs:self._offset+1]
         res[1] = self._prices.low[self._offset-ofs:self._offset+1]
@@ -141,11 +140,12 @@ class State1D(State):
 
 
 class StocksEnv(gym.Env):
-    metadata = {'render.modes': ['human']}
+    metadata = {'render_modes': ['human']}
 
     def __init__(self, prices, bars_count=DEFAULT_BARS_COUNT,
                  comission=DEFAULT_COMISSION_PERC, reset_on_close=True, state_1d=False,
                  random_ofs_on_reset=True, reward_on_close=False, volumes=False):
+        super().__init__()
         assert isinstance(prices, dict)
         self._prices = prices
         if state_1d:
@@ -155,39 +155,39 @@ class StocksEnv(gym.Env):
             self._state = State(bars_count, comission, reset_on_close, reward_on_close=reward_on_close,
                                 volumes=volumes)
         self.action_space = gym.spaces.Discrete(n=len(Actions))
-        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=self._state.shape, dtype=np.float)
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=self._state.shape, dtype=np.float64)
         self.random_ofs_on_reset = random_ofs_on_reset
-        self.seed()
+        self._np_random = None
 
-    def reset(self):
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+        if seed is not None or self._np_random is None:
+            self._np_random = np.random.default_rng(seed)
+        
         # make selection of the instrument and it's offset. Then reset the state
-        self._instrument = self.np_random.choice(list(self._prices.keys()))
+        self._instrument = self._np_random.choice(list(self._prices.keys()))
         prices = self._prices[self._instrument]
         bars = self._state.bars_count
         if self.random_ofs_on_reset:
-            offset = self.np_random.choice(prices.high.shape[0]-bars*10) + bars
+            offset = self._np_random.integers(0, prices.high.shape[0]-bars*10) + bars
         else:
             offset = bars
         self._state.reset(prices, offset)
-        return self._state.encode()
+        return self._state.encode(), {}
 
     def step(self, action_idx):
         action = Actions(action_idx)
         reward, done = self._state.step(action)
         obs = self._state.encode()
         info = {"instrument": self._instrument, "offset": self._state._offset}
-        return obs, reward, done, info
+        # gymnasium API: obs, reward, terminated, truncated, info
+        return obs, reward, done, False, info
 
-    def render(self, mode='human', close=False):
+    def render(self):
         pass
 
     def close(self):
         pass
-
-    def seed(self, seed=None):
-        self.np_random, seed1 = seeding.np_random(seed)
-        seed2 = seeding.hash_seed(seed1 + 1) % 2 ** 31
-        return [seed1, seed2]
 
     @classmethod
     def from_dir(cls, data_dir, **kwargs):

@@ -28,7 +28,7 @@ def read_csv(file_name, sep=",", filter_data=True, fix_open_price=False):
 
             po, ph, pl, pc, pv = vals
 
-            if fix_open_price and prev_vals in not None:
+            if fix_open_price and prev_vals is not None:
                 ppo, pph, ppl, ppc, ppv = prev_vals
                 if abs(po - ppc) > 1e-8:
                     po = ppc
@@ -43,11 +43,11 @@ def read_csv(file_name, sep=",", filter_data=True, fix_open_price=False):
             v.append(pv)
             prev_vals = vals
     print(f"Read done, got {count_filter + count_out}, {count_filter} filtered, {count_fixed} open prices adjusted")
-    return Prices(open=np.array(o, dtype=np.float),
-                  high=np.array(h, dtype=np.float),
-                  low=np.array(l, dtype=np.float),
-                  close=np.array(c, dtype=np.float),
-                  volume=np.array(v, dtype=np.float))
+    return Prices(open=np.array(o, dtype=np.float64),
+                  high=np.array(h, dtype=np.float64),
+                  low=np.array(l, dtype=np.float64),
+                  close=np.array(c, dtype=np.float64),
+                  volume=np.array(v, dtype=np.float64))
 
 def prices_to_relative(prices: Prices) -> Prices:
     """

@@ -32,9 +32,14 @@ if __name__ == "__main__":
     else:
         net = models.SimpleFFDQN(env.observation_space.shape[0], env.action_space.n)
 
-    net.load_state_dict(torch.load(args.model, map_location=lambda storage, loc: storage))
+    net.load_state_dict(torch.load(args.model, map_location=lambda storage, loc: storage, weights_only=True))
 
-    obs = env.reset()
+    # gymnasium API: reset returns (obs, info)
+    result = env.reset()
+    if isinstance(result, tuple):
+        obs, _ = result
+    else:
+        obs = result
     start_price = env._state._cur_close()
 
     total_reward = 0.0
@@ -50,7 +55,14 @@ if __name__ == "__main__":
             action_idx = env.action_space.sample()
         action = environ.Actions(action_idx)
 
-        obs, reward, done, _ = env.step(action_idx)
+        # gymnasium API: step returns (obs, reward, terminated, truncated, info)
+        result = env.step(action_idx)
+        if len(result) == 5:
+            obs, reward, terminated, truncated, info = result
+            done = terminated or truncated
+        else:
+            obs, reward, done, info = result
+        
         total_reward += reward
         rewards.append(total_reward)
         if step_idx % 100 == 0:

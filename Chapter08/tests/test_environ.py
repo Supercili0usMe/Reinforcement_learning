@@ -8,8 +8,9 @@ class TestEnv(unittest.TestCase):
     def test_simple(self):
         prices = data.load_relative("data/YNDX_160101_161231.csv")
         env = environ.StocksEnv({"YNDX": prices})
-        s = env.reset()
-        obs, reward, done, info = env.step(0)
+        s, info = env.reset()
+        # gymnasium API: step returns (obs, reward, terminated, truncated, info)
+        obs, reward, terminated, truncated, info = env.step(0)
         self.assertAlmostEqual(reward, 0.0, 6)
 
 
