@@ -1,34 +1,52 @@
-# ===== ОБНОВЛЕННЫЕ ЗАВИСИМОСТИ ДЛЯ RTX 5070 Ti (CUDA 12.6+) =====
-# Python 3.11 required
+# ===== ЗАВИСИМОСТИ ДЛЯ CUDA 12.8 =====
+# Сгенерировано на основе libs.txt
+# Python 3.11+ required
 
-# === PyTorch с CUDA 12.6 (устанавливается отдельной командой) ===
-# torch
-# torchvision
-# torchaudio
+# === PyTorch с CUDA 12.8 (устанавливается отдельной командой) ===
+# pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+# torch==2.11.0.dev20251226+cu128
+# torchvision==0.25.0.dev20251226+cu128
+# torchaudio==2.10.0.dev20251226+cu128
 
 # === Reinforcement Learning ===
-gymnasium[atari,accept-rom-license]==1.0.0  # замена устаревшего gym
-ale-py>=0.9.0                               # Arcade Learning Environment для Atari
+gymnasium[atari,accept-rom-license]==1.2.3  # современная замена gym
+ale-py==0.11.2                              # Arcade Learning Environment для Atari
+Shimmy==2.0.0                               # совместимость между API gym/gymnasium
+AutoROM==0.6.1                              # автоматическая загрузка ROM
+AutoROM.accept-rom-license==0.6.1
 
 # === Deep Learning утилиты ===
-numpy>=1.24.0,<2.0.0
-scipy>=1.11.0
-pillow>=10.0.0
-opencv-python>=4.8.0
-
-# === PTAN (RL библиотека) ===
-# ptan не обновлялся, может потребоваться ручная адаптация
-# Альтернатива: stable-baselines3
+numpy==2.2.6
+pillow==11.3.0
+opencv-python==4.12.0.88
 
 # === Логирование и визуализация ===
-tensorboardX>=2.6
-tensorboard>=2.14.0
+tensorboard==2.20.0
+tensorboardX==2.6.4
+matplotlib==3.10.8
+
+# === Видео и изображения ===
+imageio==2.37.2
+imageio-ffmpeg==0.6.0
+moviepy==2.2.1
+
+# === Данные и аналитика ===
+pandas==2.3.3
 
 # === Утилиты ===
-cloudpickle>=3.0.0
-packaging>=23.0
-typing-extensions>=4.5.0
+cloudpickle==3.1.2
+packaging==25.0
+typing_extensions==4.15.0
+tqdm==4.67.1
+requests==2.32.5
+python-dotenv==1.2.1
+
+# === Зависимости TensorBoard ===
+absl-py==2.3.1
+grpcio==1.76.0
+Markdown==3.10
+protobuf==6.33.2
+Werkzeug==3.1.4
 
 # === Опционально: Stable Baselines 3 (современная альтернатива ptan) ===
 # stable-baselines3[extra]>=2.2.0
-

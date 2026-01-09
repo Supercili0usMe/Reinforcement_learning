@@ -99,9 +99,9 @@ if __name__ == "__main__":
                 continue
             if eval_states_tensor is None:
                 eval_states = buffer.sample(STATES_TO_EVALUATE)
-                eval_states = [np.array(transition.state, copy=False) for transition in eval_states]
+                eval_states = [np.asarray(transition.state) for transition in eval_states]
                 # Pre-convert evaluation states once to a float32 tensor on the chosen device.
-                eval_states = np.array(eval_states, copy=False)
+                eval_states = np.asarray(eval_states)
                 eval_states_tensor = torch.tensor(eval_states, dtype=torch.float32).to(device)
 
             optimizer.zero_grad()

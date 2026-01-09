@@ -41,8 +41,8 @@ class RewardTracker:
         mean_reward = np.mean(self.total_rewards[-100:])
         mean_steps = np.mean(self.total_steps[-100:])
         epsilon_str = "" if epsilon is None else ", eps %.2f" % epsilon
-        print(f"{frame}: done {len(self.total_rewards)*self.group_rewards} games, \
-              mean reward {mean_reward:.3f}, mean steps {mean_steps:.2f}, speed {speed:.2f} f/s, epsilon {epsilon_str}")
+        print(f"{frame}: done {len(self.total_rewards)*self.group_rewards} games,\
+              mean reward {mean_reward:.3f}, mean steps {mean_steps:.2f}, speed {speed:.2f} f/s, {epsilon_str}")
         sys.stdout.flush()
         if epsilon is not None:
             self.writer.add_scalar("epsilon", epsilon, frame)
@@ -59,7 +59,7 @@ class RewardTracker:
 def calc_values_of_states(states, net, device="cpu"):
     mean_vals = []
     for batch in np.array_split(states, 64):
-        states_v = torch.tensor(batch).to(device)
+        states_v = torch.tensor(batch, dtype=torch.float32).to(device)
         action_values_v = net(states_v)
         best_action_values_v = action_values_v.max(1)[0]
         mean_vals.append(best_action_values_v.mean().item())
@@ -68,7 +68,7 @@ def calc_values_of_states(states, net, device="cpu"):
 def unpack_batch(batch):
     states, actions, rewards, dones, last_states = [], [], [], [], []
     for exp in batch:
-        state = np.array(exp.state, copy=False)
+        state = np.asarray(exp.state)
         states.append(state)
         actions.append(exp.action)
         rewards.append(exp.reward)
@@ -76,17 +76,17 @@ def unpack_batch(batch):
         if exp.last_state is None:
             last_states.append(state)
         else:
-            last_states.append(np.array(exp.last_state, copy=False))
-    return np.array(states, copy=False), np.array(actions), np.array(rewards, dtype=np.float64), \
-        np.array(dones, dtype=np.int64), np.array(last_states, copy=False)
+            last_states.append(np.asarray(exp.last_state))
+    return np.asarray(states), np.array(actions), np.array(rewards, dtype=np.float64), \
+        np.array(dones, dtype=np.int64), np.asarray(last_states)
 
 def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
     states, actions, rewards, dones, next_states = unpack_batch(batch)
 
-    states_v = torch.tensor(states).to(device)
-    next_states_v = torch.tensor(next_states).to(device)
-    actions_v = torch.tensor(actions).to(device)
-    rewards_v = torch.tensor(rewards).to(device)
+    states_v = torch.tensor(states, dtype=torch.float32).to(device)
+    next_states_v = torch.tensor(next_states, dtype=torch.float32).to(device)
+    actions_v = torch.tensor(actions, dtype=torch.int64).to(device)
+    rewards_v = torch.tensor(rewards, dtype=torch.float32).to(device)
     done_mask = torch.tensor(dones, dtype=torch.bool).to(device)
 
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)

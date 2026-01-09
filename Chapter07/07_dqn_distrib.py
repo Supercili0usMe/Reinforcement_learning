@@ -206,8 +206,8 @@ if __name__ == "__main__":
 
             if eval_states is None:
                 eval_states = buffer.sample(STATES_TO_EVALUATE)
-                eval_states = [np.array(transition.state, copy=False) for transition in eval_states]
-                eval_states = np.array(eval_states, copy=False)
+                eval_states = [np.asarray(transition.state) for transition in eval_states]
+                eval_states = np.asarray(eval_states)
 
             optimizer.zero_grad()
             batch = buffer.sample(params['batch_size'])

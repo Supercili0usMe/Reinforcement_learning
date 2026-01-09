@@ -68,7 +68,7 @@ HYPERPARAMS = {
 def unpack_batch(batch):
     states, actions, rewards, dones, last_states = [], [], [], [], []
     for exp in batch:
-        state = np.array(exp.state, copy=False)
+        state = np.asarray(exp.state)
         states.append(state)
         actions.append(exp.action)
         rewards.append(exp.reward)
@@ -76,9 +76,9 @@ def unpack_batch(batch):
         if exp.last_state is None:
             last_states.append(state)       # the result will be masked anyway
         else:
-            last_states.append(np.array(exp.last_state, copy=False))
-    return np.array(states, copy=False), np.array(actions), np.array(rewards, dtype=np.float), \
-           np.array(dones, dtype=np.int), np.array(last_states, copy=False)
+            last_states.append(np.asarray(exp.last_state))
+    return np.asarray(states), np.array(actions), np.array(rewards, dtype=np.float64), \
+           np.array(dones, dtype=np.int64), np.asarray(last_states)
 
 
 def calc_loss_dqn(batch, net, tgt_net, gamma, device="cpu"):
@@ -153,7 +153,7 @@ def distr_projection(next_distr, rewards, dones, Vmin, Vmax, n_atoms, gamma):
     "A Distributional Perspective on RL" paper
     """
     batch_size = len(rewards)
-    proj_distr = np.zeros((batch_size, n_atoms), dtype=np.float)
+    proj_distr = np.zeros((batch_size, n_atoms), dtype=np.float64)
     delta_z = (Vmax - Vmin) / (n_atoms - 1)
     for atom in range(n_atoms):
         tz_j = np.clip(rewards + (Vmin + atom * delta_z) * gamma, Vmin, Vmax)

@@ -17,7 +17,7 @@ class DiscreteOneHotWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super(DiscreteOneHotWrapper, self).__init__(env)
         assert isinstance(env.observation_space, gym.spaces.Discrete)
-        self.observation_space = gym.spaces.Box(0.0, 1.0, (env.observation_space.n, ), dtype=np.float)
+        self.observation_space = gym.spaces.Box(0.0, 1.0, (env.observation_space.n, ), dtype=np.float64)
 
     def observation(self, observation):
         res = np.copy(self.observation_space.low)

@@ -12,11 +12,14 @@ from lib import ptan_compat as ptan
 
 from tensorboardX import SummaryWriter
 
+# Определяем базовую директорию относительно расположения скрипта
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 BATCH_SIZE = 32
 BARS_COUNT = 10
 TARGET_NET_SYNC = 1000
-DEFAULT_STOCKS = "data/YNDX_160101_161231.csv"
-DEFAULT_VAL_STOCKS = "data/YNDX_150101_151231.csv"
+DEFAULT_STOCKS = os.path.join(SCRIPT_DIR, "data", "YNDX_160101_161231.csv")
+DEFAULT_VAL_STOCKS = os.path.join(SCRIPT_DIR, "data", "YNDX_150101_151231.csv")
 
 GAMMA = 0.99
 
@@ -48,7 +51,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device("cuda" if args.cuda else "cpu")
 
-    saves_path = os.path.join("saves", args.run)
+    saves_path = os.path.join("Chapter08/saves", args.run)
     os.makedirs(saves_path, exist_ok=True)
 
     if args.year is not None or os.path.isfile(args.data):
@@ -98,8 +101,8 @@ if __name__ == "__main__":
             if eval_states is None:
                 print("Initial buffer populated, start training")
                 eval_states = buffer.sample(STATES_TO_EVALUATE)
-                eval_states = [np.array(transition.state, copy=False) for transition in eval_states]
-                eval_states = np.array(eval_states, copy=False)
+                eval_states = [np.asarray(transition.state) for transition in eval_states]
+                eval_states = np.asarray(eval_states)
 
             if step_idx % EVAL_EVERY_STEP == 0:
                 mean_val = common.calc_values_of_states(eval_states, net, device=device)
